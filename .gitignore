@@ -25,3 +25,6 @@ venv/
 # Editor
 .vscode/
 .idea/
+
+# TypeScript build cache
+tsconfig.tsbuildinfo

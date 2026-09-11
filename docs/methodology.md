@@ -7,7 +7,8 @@ la Etapa 1 solo cubre lo que ya existe.
 
 Ver `docs/data-sources.md` para el detalle completo de la fuente BCRA, sus
 endpoints y las limitaciones conocidas. Todas las series de esta etapa son
-de frecuencia diaria según la clasifica el propio BCRA (`periodicidad`).
+de frecuencia diaria según la clasifica el propio BCRA (`periodicidad`),
+salvo el PBI (trimestral, cargado a mano — ver más abajo).
 
 ## Fecha de última actualización
 
@@ -19,13 +20,14 @@ gráfico de cada serie.
 ## Datos originales vs. derivados
 
 - **Originales:** todo lo que vive en `series_observations.value` viene
-  directo de la respuesta de la API del BCRA, sin transformar. Ver
+  directo de la respuesta de la API del BCRA, sin transformar (excepto el
+  PBI, que es la única serie cargada a mano — ver más abajo). Ver
   `series_observations.source_payload` para el punto crudo tal como llegó.
-- **Derivados:** variaciones diarias, variaciones sobre N observaciones, y
-  medias móviles se calculan en el momento en `lib/derived.ts` (frontend) o
-  en `scripts/bcra/transform.py` (solo para la validación de cambios
-  extremos en la ingesta). Ninguna de estas se guarda en la base en esta
-  etapa.
+- **Derivados:** variaciones diarias, variaciones sobre N observaciones,
+  medias móviles y % del PBI se calculan en el momento en `lib/derived.ts`
+  (frontend) o en `scripts/bcra/transform.py` (solo para la validación de
+  cambios extremos en la ingesta). Ninguna de estas se guarda en la base
+  en esta etapa.
 
 ### Fórmulas usadas
 
@@ -35,6 +37,26 @@ gráfico de cada serie.
   calendario (relevante por feriados/fines de semana).
 - Media móvil simple de ventana W: promedio de las últimas W observaciones.
 
+### % del PBI
+
+El BCRA no publica el PBI: se carga a mano desde `/cargar-pbi` (ver
+`docs/data-sources.md`). Para expresar una serie como % del PBI
+(`lib/pbi.ts` + `lib/derived.ts::asPercentOfAnnualizedGdp`):
+
+1. Para cada observación de la serie con fecha `d`, se busca el trimestre
+   de PBI cargado más reciente con fecha `<= d`.
+2. Ese valor trimestral se anualiza multiplicándolo ×4.
+3. `% del PBI = valor_serie / PBI_anualizado * 100`.
+
+Es una aproximación deliberada: anualizar un solo trimestre asume que los
+4 trimestres del año tienen un nivel similar al último cargado, en vez de
+sumar los 4 trimestres reales. Se eligió así para que el cálculo funcione
+desde el primer dato de PBI cargado (no hace falta esperar a tener un año
+completo), y mejora sola a medida que se cargan más trimestres: cada
+observación usa el trimestre real más cercano a su fecha, no siempre el
+último disponible. Los puntos anteriores al primer dato de PBI cargado no
+se pueden expresar como % del PBI y se omiten del gráfico.
+
 ## Validación de datos
 
 Antes de guardar una observación nueva, `scripts/bcra/transform.py` calcula
@@ -42,6 +64,8 @@ un z-score de la variación diaria contra las ~60 observaciones previas de
 esa misma serie. Si el z-score supera el umbral (por default 4), la
 observación se guarda igual pero se marca `is_flagged = true` con un
 `flag_reason`, para revisión manual — nunca se descarta automáticamente.
+Esta validación no aplica a la serie de PBI (carga manual, sin pipeline de
+ingesta automática).
 
 ## Límites conocidos de esta etapa
 
@@ -52,6 +76,8 @@ observación se guarda igual pero se marca `is_flagged = true` con un
   liquidez del sistema financiero). Ver
   `docs/series-mapping-report.md` (se genera al correr el script) para el
   estado real contra el catálogo vivo.
+- El % del PBI usa una anualización aproximada (ver arriba) mientras no
+  haya varios trimestres reales cargados.
 - Todavía no hay página de licitaciones del Tesoro ni sección de
   interacción Tesoro–liquidez: llegan en la Etapa 2.
 

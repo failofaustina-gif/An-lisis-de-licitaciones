@@ -1,14 +1,22 @@
+import Link from "next/link";
 import { getSeriesCatalog, getSeriesByDisplayName, getObservations } from "@/lib/series";
+import { getPbiObservations, pbiReferenceAsOf } from "@/lib/pbi";
 import { SeriesSelect } from "@/components/ui/SeriesSelect";
 import { StatCard } from "@/components/ui/StatCard";
+import { PbiToggle } from "@/components/ui/PbiToggle";
 import { SeriesChart } from "@/components/charts/SeriesChart";
-import { changeOverLastN, withDailyChange } from "@/lib/derived";
+import {
+  changeOverLastN,
+  withDailyChange,
+  asPercentOfAnnualizedGdp,
+  type TimePoint,
+} from "@/lib/derived";
 import { formatDate, formatNumber, formatPercent } from "@/lib/format";
 
 export const dynamic = "force-dynamic"; // los datos cambian a diario; no cachear la página estáticamente
 
 interface PageProps {
-  searchParams: { serie?: string };
+  searchParams: { serie?: string; pbi?: string };
 }
 
 export default async function AgregadosPage({ searchParams }: PageProps) {
@@ -23,7 +31,16 @@ export default async function AgregadosPage({ searchParams }: PageProps) {
   const selectedSeries =
     (await getSeriesByDisplayName(selectedName)) ?? firstSeries;
 
-  const observations = await getObservations(selectedSeries.id);
+  const rawObservations = await getObservations(selectedSeries.id);
+  const pbiObservations = await getPbiObservations();
+
+  const pbiRequested = searchParams.pbi === "1";
+  const showPct = pbiRequested && pbiObservations.length > 0;
+
+  const observations: TimePoint[] = showPct
+    ? asPercentOfAnnualizedGdp(rawObservations, pbiObservations)
+    : rawObservations;
+
   const withChange = withDailyChange(observations);
   const last = observations.at(-1);
   const dailyChange = withChange.at(-1);
@@ -31,6 +48,8 @@ export default async function AgregadosPage({ searchParams }: PageProps) {
   const change5 = changeOverLastN(observations, 5);
   const change20 = changeOverLastN(observations, 20);
   const change60 = changeOverLastN(observations, 60);
+
+  const pbiRef = last ? pbiReferenceAsOf(last.date, pbiObservations) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,19 +59,31 @@ export default async function AgregadosPage({ searchParams }: PageProps) {
             {selectedSeries.original_name}
           </h1>
           <p className="text-sm text-ink-500 mt-1">
-            {selectedSeries.unit} · frecuencia {readableFrequency(selectedSeries.frequency)} ·
-            {" "}
-            fuente {selectedSeries.source}
+            {showPct ? "% del PBI (anualizado)" : selectedSeries.unit} · frecuencia{" "}
+            {readableFrequency(selectedSeries.frequency)} · fuente {selectedSeries.source}
           </p>
         </div>
-        <SeriesSelect catalog={catalog} selected={selectedSeries.display_name} />
+        <div className="flex flex-wrap items-end gap-3">
+          <PbiToggle active={showPct} disabled={pbiObservations.length === 0} />
+          <SeriesSelect catalog={catalog} selected={selectedSeries.display_name} />
+        </div>
       </div>
+
+      {pbiRequested && pbiObservations.length === 0 ? (
+        <p className="text-sm text-warn">
+          Todavía no cargaste ningún dato de PBI, así que se muestran los
+          valores originales.{" "}
+          <Link href="/cargar-pbi" className="underline hover:text-accent">
+            Cargar PBI →
+          </Link>
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {last ? (
           <StatCard
             label="Último valor"
-            value={formatNumber(last.value)}
+            value={showPct ? formatPercentValue(last.value) : formatNumber(last.value)}
             sublabel={formatDate(last.date)}
           />
         ) : null}
@@ -89,9 +120,21 @@ export default async function AgregadosPage({ searchParams }: PageProps) {
       <div className="rounded-lg border border-ink-100 bg-white p-4">
         <SeriesChart
           data={observations.map((o) => ({ date: o.date, value: o.value }))}
-          unit={selectedSeries.unit}
+          unit={showPct ? "% del PBI" : selectedSeries.unit}
         />
       </div>
+
+      {showPct && pbiRef ? (
+        <p className="text-xs text-ink-500">
+          % del PBI calculado contra el PBI de referencia del trimestre{" "}
+          {formatDate(pbiRef.quarterDate)} ({formatNumber(pbiRef.value)} ARS millones),
+          anualizado ×4 ({formatNumber(pbiRef.value * 4)} ARS millones). Ver{" "}
+          <Link href="/cargar-pbi" className="underline hover:text-accent">
+            /cargar-pbi
+          </Link>{" "}
+          para cargar más trimestres.
+        </p>
+      ) : null}
 
       {selectedSeries.metadata?.ultima_fecha_informada ? (
         <p className="text-xs text-ink-500">
@@ -103,6 +146,10 @@ export default async function AgregadosPage({ searchParams }: PageProps) {
       ) : null}
     </div>
   );
+}
+
+function formatPercentValue(value: number): string {
+  return `${formatNumber(value, 1)}%`;
 }
 
 function readableFrequency(freq: string): string {

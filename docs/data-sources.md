@@ -88,6 +88,27 @@ darlos por definitivos.
 
 ---
 
+## PBI (cargado a mano)
+
+El BCRA no publica el PBI, así que no hay script de sincronización para
+esta serie. Se carga manualmente desde `/cargar-pbi` en la app (ver
+`app/api/pbi/route.ts`), que la guarda en `series_catalog` /
+`series_observations` como cualquier otra serie, con `source = 'manual'` y
+`source_series_id = 'pbi_nominal'` — así el resto de la lectura
+(`lib/series.ts`, la página de agregados) no necesita ningún caso
+especial.
+
+Se espera PBI nominal (a precios corrientes), en ARS millones, con la
+fecha de fin de cada trimestre. Ver `docs/methodology.md` para cómo se usa
+para expresar otras series como % del PBI.
+
+Sin autenticación: la carga no está protegida (decisión explícita del
+usuario del proyecto). Si en el futuro hace falta protegerla, agregar una
+verificación simple en `app/api/pbi/route.ts` antes de escribir en
+Supabase.
+
+---
+
 ## Tesoro — Licitaciones (Etapa 2, todavía no implementado)
 
 El módulo de licitaciones del Tesoro se documentará acá cuando se

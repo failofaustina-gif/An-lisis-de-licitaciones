@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 
 const NAV_ITEMS = [
   { href: "/agregados", label: "Agregados monetarios" },
+  { href: "/cargar-pbi", label: "Cargar PBI" },
   // Las siguientes secciones se agregan en próximas etapas del proyecto:
   // { href: "/licitaciones", label: "Licitaciones del Tesoro" },
   // { href: "/liquidez", label: "Tesoro y liquidez" },

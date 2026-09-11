@@ -39,7 +39,12 @@ def _normalize(text: str) -> str:
 def match_rule(rule: SeriesRule, catalog: list[CatalogEntry]) -> MatchResult:
     if rule.exact:
         exact_norm = {_normalize(e) for e in rule.exact}
-        exact_matches = tuple(c for c in catalog if _normalize(c.descripcion) in exact_norm)
+        exact_matches = tuple(
+            c
+            for c in catalog
+            if _normalize(c.descripcion) in exact_norm
+            and (not rule.categoria_bcra or c.categoria in rule.categoria_bcra)
+        )
         if exact_matches:
             return MatchResult(rule=rule, matches=exact_matches)
         # Sin match exacto: si la regla también define `include`, cae a
@@ -55,6 +60,8 @@ def match_rule(rule: SeriesRule, catalog: list[CatalogEntry]) -> MatchResult:
         if rule.include and not all(term.lower() in desc for term in rule.include):
             continue
         if rule.exclude and any(term.lower() in desc for term in rule.exclude):
+            continue
+        if rule.categoria_bcra and entry.categoria not in rule.categoria_bcra:
             continue
         if not rule.include:
             # No hay `include` (y si había `exact`, ya falló arriba): no hay
