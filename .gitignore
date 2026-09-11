@@ -1,0 +1,27 @@
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+
+# Node
+/node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env
+.env
+.env.local
+.env*.local
+
+# Logs / OS
+*.log
+.DS_Store
+
+# Editor
+.vscode/
+.idea/

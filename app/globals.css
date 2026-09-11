@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-paper text-ink-900 antialiased;
+}
+
+/* Números tabulares para que las tablas de series alineen bien */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
