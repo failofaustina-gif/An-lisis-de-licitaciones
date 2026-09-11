@@ -185,6 +185,10 @@ def run_sync(mode: str, dry_run: bool) -> int:
 
 
 def main() -> int:
+    # Soporta tanto .env (convención python-dotenv) como .env.local
+    # (convención Next.js) para no pedirle a quien corre esto que duplique
+    # el archivo de entorno entre el frontend y los scripts.
+    load_dotenv(".env.local")
     load_dotenv()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mode", choices=["full", "incremental"], help="Modo de sincronización")
